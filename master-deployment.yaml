@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-master-deployment
+  labels:
+    app: locust-master
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: locust-master
+  template:
+    metadata:
+      labels:
+        app: locust-master
+    spec:
+      containers:
+      - name: locust-master
+        image: locustio/locust
+        ports:
+        - containerPort: 8089
+        env:
+        - name: LOCUSTFILE_PATH
+          value: /mnt/locust/locustfile.py
+        - name: TARGET_URL
+          value: ##TARGET_URL##
+        - name: LOCUST_MODE
+          value: master
+        - name: PYTHONUNBUFFERED
+          value: "0"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        volumeMounts:
+          - mountPath: "/mnt/locust"
+            name: master-volume
+      initContainers:
+        - name: install
+          image: busybox
+          command:
+          - wget
+          - "-O"
+          - "/mnt/locust/locustfile.py"
+          - ##LOCUST_SCRIPT_URL##
+          volumeMounts:
+            - mountPath: "/mnt/locust"
+              name: master-volume
+      dnsPolicy: Default
+      volumes:
+        - name: master-volume
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: locust-loadbalancer
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8089
+    targetPort: 8089
+  selector:
+    app: locust-master

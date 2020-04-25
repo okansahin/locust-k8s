@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: locust-slave-deployment
+  labels:
+    app: locust-slave
+spec:
+  replicas: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: locust-slave
+  template:
+    metadata:
+      labels:
+        app: locust-slave
+    spec:
+      containers:
+      - name: locust-slave
+        image: locustio/locust
+        ports:
+        - containerPort: 8089
+        env:
+        - name: LOCUSTFILE_PATH
+          value: /mnt/locust/locustfile.py
+        - name: TARGET_URL
+          value: ##TARGET_URL##
+        - name: LOCUST_MODE
+          value: slave
+        - name: LOCUST_MASTER_HOST
+          value: ##LOCUST_MASTER_HOST_IP##
+        - name: PYTHONUNBUFFERED
+          value: "0"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        volumeMounts:
+          - mountPath: "/mnt/locust"
+            name: master-volume
+      initContainers:
+        - name: install
+          image: busybox
+          command:
+          - wget
+          - "-O"
+          - "/mnt/locust/locustfile.py"
+          - ##LOCUST_SCRIPT_URL##
+          volumeMounts:
+            - mountPath: "/mnt/locust"
+              name: master-volume
+      dnsPolicy: Default
+      volumes:
+        - name: master-volume
+          emptyDir: {}
